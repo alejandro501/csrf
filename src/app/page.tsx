@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
   const [payload, setPayload] = useState({
@@ -17,17 +17,61 @@ export default function Home() {
   const [testResult, setTestResult] = useState<{ status: number; response: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const generatePayload = () => {
+  // Function to parse HTML and extract form data
+  const parseHTML = (html: string) => {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const form = doc.querySelector('form');
+      
+      if (form) {
+        const action = form.getAttribute('action') || '';
+        const method = form.getAttribute('method')?.toUpperCase() || 'POST';
+        const inputs = form.querySelectorAll('input[type="hidden"]');
+        
+        const params = Array.from(inputs).map(input => ({
+          name: input.getAttribute('name') || '',
+          value: input.getAttribute('value') || ''
+        }));
+
+        setPayload({
+          action,
+          method,
+          params
+        });
+      }
+    } catch (error) {
+      console.error('Error parsing HTML:', error);
+    }
+  };
+
+  // Generate HTML from form data
+  const generateHTML = () => {
     const html = `
-<form id="attack" action="${payload.action}" method="${payload.method}">
-  ${payload.params.map(param => 
-    `<input type="hidden" name="${param.name}" value="${param.value}">`
-  ).join('\n  ')}
-</form>
-<script>document.getElementById('attack').submit();</script>`;
+<html>
+  <body>
+    <form action="${payload.action}" method="${payload.method}">
+      ${payload.params.map(param => 
+        `<input type="hidden" name="${param.name}" value="${param.value}" />`
+      ).join('\n      ')}
+      <input type="submit" value="Submit request" />
+    </form>
+    <script>
+      history.pushState('', '', '/');
+      document.forms[0].submit();
+    </script>
+  </body>
+</html>`;
 
     setGeneratedHTML(html);
   };
+
+  // Update HTML when form data changes
+  useEffect(() => {
+    if (payload.params.length > 0) {
+      generateHTML();
+    }
+  }, [payload]);
 
   const addParam = () => {
     setPayload(prev => ({
@@ -57,17 +101,15 @@ export default function Home() {
     setTestResult(null);
 
     try {
-      // Create form data from params
       const formData = new FormData();
       payload.params.forEach(param => {
         formData.append(param.name, param.value);
       });
 
-      // Make the request
       const response = await fetch(payload.action, {
         method: payload.method,
         body: formData,
-        mode: 'no-cors' // This is important for CSRF testing
+        mode: 'no-cors'
       });
 
       setTestResult({
@@ -87,117 +129,119 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-primary text-white">
       <div className="container">
-        <div className="py-8">
-          <h1 className="text-2xl font-primary mb-8 text-accent">CSRF POC Generator</h1>
-          
-          {/* Target URL */}
-          <div className="mb-6">
-            <input
-              type="text"
-              value={payload.action}
-              onChange={(e) => setPayload(prev => ({ ...prev, action: e.target.value }))}
-              placeholder="Target URL"
-              className="w-full p-3 bg-primary border border-accent rounded focus:border-accent-hover focus:outline-none transition-colors"
-            />
-          </div>
-
-          {/* Method */}
-          <div className="mb-6">
-            <select
-              value={payload.method}
-              onChange={(e) => setPayload(prev => ({ ...prev, method: e.target.value }))}
-              className="w-full p-3 bg-primary border border-accent rounded focus:border-accent-hover focus:outline-none transition-colors"
-            >
-              <option value="POST">POST</option>
-              <option value="GET">GET</option>
-            </select>
-          </div>
-
-          {/* Parameters */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-primary text-accent">Parameters</h2>
-              <button
-                onClick={addParam}
-                className="px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95"
-              >
-                Add Param
-              </button>
-            </div>
-            
-            {payload.params.map((param, index) => (
-              <div key={index} className="flex gap-3 mb-3">
-                <input
-                  type="text"
-                  value={param.name}
-                  onChange={(e) => updateParam(index, 'name', e.target.value)}
-                  placeholder="Name"
-                  className="flex-1 p-3 bg-primary border border-accent rounded focus:border-accent-hover focus:outline-none transition-colors"
-                />
-                <input
-                  type="text"
-                  value={param.value}
-                  onChange={(e) => updateParam(index, 'value', e.target.value)}
-                  placeholder="Value"
-                  className="flex-1 p-3 bg-primary border border-accent rounded focus:border-accent-hover focus:outline-none transition-colors"
-                />
-                <button
-                  onClick={() => removeParam(index)}
-                  className="px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Generate and Test Buttons */}
-          <div className="flex gap-4 mb-6">
-            <button
-              onClick={generatePayload}
-              className="flex-1 p-3 bg-accent text-white rounded hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Generate Payload
-            </button>
+        <div className="py-12">
+          <div className="flex justify-between items-center mb-12">
+            <h1 className="text-3xl font-primary text-accent tracking-wider">CSRF POC Generator</h1>
             <button
               onClick={testPayload}
               disabled={!generatedHTML || isLoading}
-              className="flex-1 p-3 bg-accent text-white rounded hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-[48px] px-8 bg-accent text-primary rounded-full hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95 font-semibold uppercase tracking-[2px] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Testing...' : 'Test Payload'}
             </button>
           </div>
+          
+          <div className="grid grid-cols-2 gap-8">
+            {/* Left Column - Form Fields */}
+            <div className="space-y-8">
+              <div>
+                <input
+                  type="text"
+                  value={payload.action}
+                  onChange={(e) => setPayload(prev => ({ ...prev, action: e.target.value }))}
+                  placeholder="Target URL"
+                  className="w-full h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
+                />
+              </div>
 
-          {/* Generated HTML */}
-          {generatedHTML && (
-            <div className="bg-primary/50 p-6 rounded border border-accent mb-6">
-              <h2 className="font-primary text-accent mb-4">Generated Payload:</h2>
-              <pre className="bg-primary p-4 rounded text-sm overflow-x-auto border border-accent">
-                {generatedHTML}
-              </pre>
-            </div>
-          )}
+              <div>
+                <select
+                  value={payload.method}
+                  onChange={(e) => setPayload(prev => ({ ...prev, method: e.target.value }))}
+                  className="w-full h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
+                >
+                  <option value="POST">POST</option>
+                  <option value="GET">GET</option>
+                </select>
+              </div>
 
-          {/* Test Results */}
-          {testResult && (
-            <div className="bg-primary/50 p-6 rounded border border-accent">
-              <h2 className="font-primary text-accent mb-4">Test Results:</h2>
-              <div className="space-y-4">
-                <div>
-                  <span className="text-accent">Status: </span>
-                  <span className={testResult.status === 200 ? 'text-green-500' : 'text-red-500'}>
-                    {testResult.status}
-                  </span>
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="font-primary text-accent text-xl tracking-wider">Parameters</h2>
+                  <button
+                    onClick={addParam}
+                    className="h-[44px] px-6 bg-accent text-primary rounded-full hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95 font-semibold"
+                  >
+                    Add Param
+                  </button>
                 </div>
-                <div>
-                  <span className="text-accent">Response: </span>
-                  <pre className="mt-2 bg-primary p-4 rounded text-sm overflow-x-auto border border-accent">
-                    {testResult.response}
-                  </pre>
-                </div>
+                
+                {payload.params.map((param, index) => (
+                  <div key={index} className="flex gap-4 mb-4">
+                    <input
+                      type="text"
+                      value={param.name}
+                      onChange={(e) => updateParam(index, 'name', e.target.value)}
+                      placeholder="Name"
+                      className="flex-1 h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
+                    />
+                    <input
+                      type="text"
+                      value={param.value}
+                      onChange={(e) => updateParam(index, 'value', e.target.value)}
+                      placeholder="Value"
+                      className="flex-1 h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
+                    />
+                    <button
+                      onClick={() => removeParam(index)}
+                      className="h-[44px] w-[44px] bg-accent text-primary rounded-full hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 active:scale-95 font-semibold flex items-center justify-center"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
-          )}
+
+            {/* Right Column - HTML Editor */}
+            <div className="space-y-8">
+              <div className="bg-primary/50 p-8 rounded-2xl border border-accent">
+                <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">HTML Payload:</h2>
+                <textarea
+                  value={generatedHTML}
+                  onChange={(e) => {
+                    setGeneratedHTML(e.target.value);
+                    parseHTML(e.target.value);
+                  }}
+                  className="w-full h-[400px] p-6 bg-primary rounded-xl text-sm font-mono border border-accent focus:border-accent-hover focus:outline-none transition-colors"
+                  spellCheck="false"
+                />
+              </div>
+
+              {/* Test Results */}
+              {testResult && (
+                <div className="bg-primary/50 p-8 rounded-2xl border border-accent">
+                  <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">Test Results:</h2>
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2">
+                      <span className="text-accent font-semibold">Status:</span>
+                      <span className={`px-4 py-1 rounded-full text-sm font-semibold ${
+                        testResult.status === 200 ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
+                      }`}>
+                        {testResult.status}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-accent font-semibold block mb-3">Response:</span>
+                      <pre className="bg-primary p-6 rounded-xl text-sm overflow-x-auto border border-accent">
+                        {testResult.response}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
