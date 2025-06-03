@@ -7,9 +7,7 @@ import { Textarea } from "@/app/components/ui/textarea";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/app/components/ui/select";
@@ -91,7 +89,7 @@ export default function Home() {
 
   useEffect(() => {
     if (payload.params.length > 0) generateHTML();
-  }, [payload]);
+  }, [payload, generateHTML]);
 
   const addParam = () => {
     setPayload((prev) => ({
@@ -201,10 +199,10 @@ export default function Home() {
               </h2>
               <Select
                 value={payload.method}
-                onValueChange={(value) =>
+                onValueChange={(value: "GET" | "POST" | "PUT" | "DELETE") =>
                   setPayload((prev) => ({
                     ...prev,
-                    method: value as "GET" | "POST" | "PUT" | "DELETE",
+                    method: value,
                   }))
                 }
               >
