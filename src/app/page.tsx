@@ -4,6 +4,15 @@ import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
 
 interface Param {
   name: string;
@@ -12,7 +21,7 @@ interface Param {
 
 interface Payload {
   action: string;
-  method: "POST" | "GET";
+  method: "GET" | "POST" | "PUT" | "DELETE";
   params: Param[];
 }
 
@@ -45,7 +54,7 @@ export default function Home() {
       if (form) {
         const action = form.getAttribute("action") || "";
         const method = (form.getAttribute("method")?.toUpperCase() ||
-          "POST") as "POST" | "GET";
+          "POST") as "GET" | "POST" | "PUT" | "DELETE";
         const inputs = form.querySelectorAll('input[type="hidden"]');
         const params = Array.from(inputs).map((input) => ({
           name: input.getAttribute("name") || "",
@@ -152,7 +161,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-primary text-white">
-      <div className="container py-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex justify-between items-center mb-12">
           <h1 className="text-3xl font-primary text-accent tracking-wider">
             CSRF POC Generator
@@ -160,69 +169,92 @@ export default function Home() {
           <Button
             onClick={testPayload}
             disabled={!generatedHTML || isLoading}
-            variant="default"
+            variant="action"
             size="lg"
           >
             {isLoading ? "Testing..." : "Test Payload"}
           </Button>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-7xl mx-auto">
           {/* Left Column - Form Fields */}
           <div className="space-y-8">
-            <Input
-              value={payload.action}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setPayload((prev) => ({ ...prev, action: e.target.value }))
-              }
-              placeholder="Target URL"
-            />
+            <div>
+              <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">
+                Target URL
+              </h2>
+              <Input
+                className="w-full"
+                value={payload.action}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setPayload((prev) => ({ ...prev, action: e.target.value }))
+                }
+                placeholder="Target URL"
+              />
+            </div>
 
-            <select
-              value={payload.method}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                setPayload((prev) => ({
-                  ...prev,
-                  method: e.target.value as "POST" | "GET",
-                }))
-              }
-              className="w-full h-[44px] px-6 bg-primary border border-accent rounded-full focus:border-accent-hover focus:outline-none transition-colors text-base"
-            >
-              <option value="POST">POST</option>
-              <option value="GET">GET</option>
-            </select>
+            <div>
+              <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">
+                Method
+              </h2>
+              <Select
+                value={payload.method}
+                onValueChange={(value) =>
+                  setPayload((prev) => ({
+                    ...prev,
+                    method: value as "GET" | "POST" | "PUT" | "DELETE",
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full h-[48px] px-4 py-5 text-base text-white/60 placeholder:text-white/10 focus:border-red-700 outline-none border border-red-500 rounded-md">
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                  <SelectItem value="PUT">PUT</SelectItem>
+                  <SelectItem value="DELETE">DELETE</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <div>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="font-primary text-accent text-xl tracking-wider">
                   Parameters
                 </h2>
-                <Button onClick={addParam} variant="default" size="default">
+                <Button onClick={addParam} variant="action" size="default">
                   Add Param
                 </Button>
               </div>
 
               {payload.params.map((param, index) => (
-                <div key={index} className="flex gap-4 mb-4">
-                  <Input
-                    value={param.name}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      updateParam(index, "name", e.target.value)
-                    }
-                    placeholder="Name"
-                  />
-                  <Input
-                    value={param.value}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      updateParam(index, "value", e.target.value)
-                    }
-                    placeholder="Value"
-                  />
+                <div key={index} className="flex items-start gap-4 mb-4 w-full">
+                  <div className="flex flex-col w-full gap-2 flex-grow">
+                    <Input
+                      value={param.name}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        updateParam(index, "name", e.target.value)
+                      }
+                      placeholder="Name"
+                      className="w-full"
+                    />
+                    <Input
+                      value={param.value}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        updateParam(index, "value", e.target.value)
+                      }
+                      placeholder="Value"
+                      className="w-full"
+                    />
+                  </div>
                   <Button
                     onClick={() => removeParam(index)}
                     variant="default"
                     size="default"
-                    className="w-[44px] p-0"
+                    className="w-auto p-0 text-xl text-red-500 hover:text-white"
                   >
                     ×
                   </Button>
@@ -233,7 +265,7 @@ export default function Home() {
 
           {/* Right Column - HTML Editor */}
           <div className="space-y-8">
-            <div className="bg-primary/50 p-8 rounded-2xl border border-accent">
+            <div className="bg-primary/50 p-8 rounded-2xl border border-red-500">
               <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">
                 HTML Payload:
               </h2>
@@ -250,7 +282,7 @@ export default function Home() {
 
             {/* Test Results */}
             {testResult && (
-              <div className="bg-primary/50 p-8 rounded-2xl border border-accent">
+              <div className="bg-primary/50 p-8 rounded-2xl border border-red-500">
                 <h2 className="font-primary text-accent mb-6 text-xl tracking-wider">
                   Test Results:
                 </h2>
